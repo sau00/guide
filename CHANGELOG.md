@@ -1,3 +1,7 @@
+# 2019-12-10
+
+- Recommend using the `time` package when dealing with time.
+
 # 2019-11-26
 
 - Add guidance against mutating global variables.
