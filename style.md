@@ -60,12 +60,12 @@ row before the </tbody></table> line.
   - [Указатели на интерфейсы](#Указатели-на-интерфейсы)
   - [Проверка соответствия интерфейса](#проверка-соответствия-интерфейса)
   - [Получатели и Интерфейсы](#получатели-и-интерфейсы)
-  - [Мьютексы с нулевыми значениями допустимы](#мьютексы-с-нулевыми-значениями-допустимы)
+  - [Допустимо использование Мьютексов с нулевыми значениями](#допустимо-использование-Мьютексов-с-нулевыми-значениями)
   - [Копирование слайсов и мап на границах](#копирование-слайсов-и-мап-на-границах)
   - [Отложенный вызов функции для высвобождения ресурсов](#отложенный-вызов-функции-для-высвобождения-ресурсов)
-  - [Channel Size is One or None](#channel-size-is-one-or-none)
-  - [Start Enums at One](#start-enums-at-one)
-  - [Use `"time"` to handle time](#use-time-to-handle-time)
+  - [Размер канала либо Один либо не указан](#размер-канала-либо-один-либо-не-указан)
+  - [Начинайте перечисления с единицы](#начинайте-перечисления-с-единицы)
+  - [Используйте пакет `"time"` для работы со временем](#используйте-пакет-"time"-для-работы-со-временем)
   - [Errors](#errors)
     - [Error Types](#error-types)
     - [Error Wrapping](#error-wrapping)
@@ -295,7 +295,7 @@ i = s2Ptr
 
 [Pointers vs. Values]: https://golang.org/doc/effective_go.html#pointers_vs_values
 
-### Мьютексы с нулевыми значениями допустимы
+### Допустимо использование Мьютексов с нулевыми значениями
 
 Нулевые значения `sync.Mutex` и `sync.RWMutex` допустимы, поэтому вам практически никогда не понадобится указатель на мьютекс.
 
@@ -533,41 +533,35 @@ return p.count
 
 Отложенный вызов функции имеет очень маленький оверхед по ресурсам и его следует избегать только если есть реальное обоснование того, что время выполнения функции не должно превышать порядков в наносекунды. Читаемость кода, получаемая благодаря использованию отложенных вызовов сильно выше накладных расходов. Это особенно заметно в больших методах, где есть больше чем просто чтение из памяти, а остальные вычисления значительно затратнее чем `defer`. 
 
-### Channel Size is One or None
+### Размер канала либо Один либо не указан
 
-Channels should usually have a size of one or be unbuffered. By default,
-channels are unbuffered and have a size of zero. Any other size
-must be subject to a high level of scrutiny. Consider how the size is
-determined, what prevents the channel from filling up under load and blocking
-writers, and what happens when this occurs.
+Каналы должны обычно иметь либо размерность один, либо быть небуферизированными. По умолчанию каналы небуферизированы и имеют размер равный нулю. Любой другой размер должен быть предметом тщательных обсуждений. Заранее определенный размер канала предотвращает его переполнение под высокой нагрузкой, что позволяет избежать блокировок.
 
 <table>
-<thead><tr><th>Bad</th><th>Good</th></tr></thead>
+<thead><tr><th>Плохо</th><th>Хорошо</th></tr></thead>
 <tbody>
 <tr><td>
 
 ```go
-// Ought to be enough for anybody!
+//  64kb должно хватить на всех!
 c := make(chan int, 64)
 ```
 
 </td><td>
 
 ```go
-// Size of one
-c := make(chan int, 1) // or
-// Unbuffered channel, size of zero
+// Размерность один
+c := make(chan int, 1) // или
+// Небуферизированный канал размерностью 0
 c := make(chan int)
 ```
 
 </td></tr>
 </tbody></table>
 
-### Начинайте перечисления (Enums) с единицы
+### Начинайте перечисления с единицы
 
-Стандартный путь объявления перечислений в Go начинается с создания кастомного
-типа и группы `const` при помощи `iota`. Так как значением по умолчанию для переменных
-является 0, необходимо вводить перечисления, начинающихся с ненулевого значения, например с 1.
+Стандартным способом объявления перечислений в Go является создание кастомного типа и группы `const` при помощи `iota`. Так как значением по умолчанию для переменных является 0, необходимо начинать перечисления с ненулевого значения, например с 1.
 
 <table>
 <thead><tr><th>Плохо</th><th>Хорошо</th></tr></thead>
@@ -604,7 +598,7 @@ const (
 </tbody></table>
 
 Существуют случаи, когда использование нулевого значения имеет смысл, например,
-в тех ситуациях, когда нулевое значение является желаемым значением по умолчанию.
+в тех ситуациях, когда нулевое значение является ожидаемым значением по умолчанию.
 
 ```go
 type LogOutput int
@@ -617,6 +611,153 @@ const (
 
 // LogToStdout=0, LogToFile=1, LogToRemote=2
 ```
+
+### Используйте пакет `"time"` для работы со временем
+
+Время - это сложная штука. Часто делаются неверные предположения о времени, которые включают в себя следующее:
+
+1. День состоит из 24 часов
+2. Час состоит из 60 минут
+3. Неделя состоит из 7 дней
+4. Год состоит из 365 дней
+5. [Еще больше](https://infiniteundo.com/post/25326999628/falsehoods-programmers-believe-about-time)
+
+Например, *1* означает, что добавление 24 часов к моменту времени не всегда дает новый календарный день.
+
+Поэтому всегда пользуйтесь пакетом [`"time"`] при работе со временем, так как он помогает работать с этими неверными предположениями более безопасным и точным способом.
+
+  [`"time"`]: https://golang.org/pkg/time/
+
+#### Используйте `time.Time` для конкретных моментов времени
+
+Используйте [`time.Time`] при работе с моментами времени и методы для `time.Time` при сравнении, добавлении или вычитании времени.
+
+  [`time.Time`]: https://golang.org/pkg/time/#Time
+
+<table>
+<thead><tr><th>Плохо</th><th>Хорошо</th></tr></thead>
+<tbody>
+<tr><td>
+
+```go
+func isActive(now, start, stop int) bool {
+  return start <= now && now < stop
+}
+```
+
+</td><td>
+
+```go
+func isActive(now, start, stop time.Time) bool {
+  return (start.Before(now) || start.Equal(now)) && now.Before(stop)
+}
+```
+
+</td></tr>
+</tbody></table>
+
+#### Используйте `time.Duration` для временных промежутков
+
+Используйте [`time.Duration`] когда работаете с временными промежутками.
+
+  [`time.Duration`]: https://golang.org/pkg/time/#Duration
+
+<table>
+<thead><tr><th>Плохо</th><th>Хорошо</th></tr></thead>
+<tbody>
+<tr><td>
+
+```go
+func poll(delay int) {
+  for {
+    // ...
+    time.Sleep(time.Duration(delay) * time.Millisecond)
+  }
+}
+
+poll(10) // это 10 секунд или милисекунд?
+```
+
+</td><td>
+
+```go
+func poll(delay time.Duration) {
+  for {
+    // ...
+    time.Sleep(delay)
+  }
+}
+
+poll(10*time.Second)
+```
+
+</td></tr>
+</tbody></table>
+
+Возвращаясь к примеру с добавлением 24 часов, метод, который мы используем для добавления времени зависит от того что мы хотим получить в итоге. Если мы хотим то же время дня, но на следующий календарный день, мы должны использовать [`Time.AddDate`]. Однако, если мы хотим, чтобы момент времени гарантированно был через 24 часа после предыдущего времени, мы должны использовать [`Time.Add`].
+
+  [`Time.AddDate`]: https://golang.org/pkg/time/#Time.AddDate
+  [`Time.Add`]: https://golang.org/pkg/time/#Time.Add
+
+```go
+newDay := t.AddDate(0 /* года */, 0 /* месяцы */, 1 /* дни */)
+maybeNewDay := t.Add(24 * time.Hour)
+```
+
+#### Используйте `time.Time` и `time.Duration` при взаимодействии с внешними системами
+
+Используйте `time.Duration` и `time.Time` при взаимодействии с внешними системами, когда это возможно. Например:
+
+- Флаги командной строки: [`flag`] поддерживает `time.Duration` при помощи [`time.ParseDuration`]
+- JSON: [`encoding/json`] поддерживает `time.Time` по стандарту [RFC 3339] строки при помощи метода [`UnmarshalJSON`]
+- SQL: [`database/sql`] поддерживает конвертацию `DATETIME` или `TIMESTAMP` в `time.Time` и обратно в зависимости от используемого драйвера
+- YAML: [`gopkg.in/yaml.v2`] поддерживает `time.Time` по стандарту [RFC 3339] строки, а также `time.Duration` при помощи [`time.ParseDuration`].
+
+  [`flag`]: https://golang.org/pkg/flag/
+  [`time.ParseDuration`]: https://golang.org/pkg/time/#ParseDuration
+  [`encoding/json`]: https://golang.org/pkg/encoding/json/
+  [RFC 3339]: https://tools.ietf.org/html/rfc3339
+  [`UnmarshalJSON`]: https://golang.org/pkg/time/#Time.UnmarshalJSON
+  [`database/sql`]: https://golang.org/pkg/database/sql/
+  [`gopkg.in/yaml.v2`]: https://godoc.org/gopkg.in/yaml.v2
+
+В случае если нет возможности воспользоваться `time.Duration`, используйте `int` или `float64` и включите единицы измерения в название поля.
+
+Например, так как `encoding/json` не поддерживает `time.Duration`, в примере ниже единица измерения включена в название поля.
+
+<table>
+<thead><tr><th>Плохо</th><th>Хорошо</th></tr></thead>
+<tbody>
+<tr><td>
+
+```go
+// {"interval": 2}
+type Config struct {
+  Interval int `json:"interval"`
+}
+```
+
+</td><td>
+
+```go
+// {"intervalMillis": 2000}
+type Config struct {
+  IntervalMillis int `json:"intervalMillis"`
+}
+```
+
+</td></tr>
+</tbody></table>
+
+В случае если нет возможности воспользоваться `time.Time`, и альтернативный формат несогласован, используйте `string` по стандарту [RFC 3339]. Этот формат используется по умолчанию методом [`Time.UnmarshalText`] и доступен для использования в `Time.Format` и `time.Parse` по [`time.RFC3339`].
+
+  [`Time.UnmarshalText`]: https://golang.org/pkg/time/#Time.UnmarshalText
+  [`time.RFC3339`]: https://golang.org/pkg/time/#RFC3339
+
+Хотя на практике это обычно не представляет проблемы, имейте в виду, что пакет `"time"` не поддерживает синтаксический анализ временных меток с дополнительными секундами ([8728]) и не учитывает дополнительные секунды в расчетах ([15190]). Если вы сравните два момента времени, разница не будет включать високосные секунды, которые могли произойти между этими двумя моментами.
+
+  [8728]: https://github.com/golang/go/issues/8728
+  [15190]: https://github.com/golang/go/issues/15190
 
 <!-- TODO: section on String methods for enums -->
 
